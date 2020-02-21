@@ -353,7 +353,7 @@ def interpret_tree(scene):
     for i in range(scene.node_count):
         T.in_degree()
     root = roots[0]
-    edges = zip(scene.tree.row_nodes, scene.tree.column_nodes)
-    edge_rate_pairs = zip(edges, scene.tree.edge_rate_scaling_factors)
-    edge_process_pairs = zip(edges, scene.tree.edge_processes)
+    edges = list(zip(scene.tree.row_nodes, scene.tree.column_nodes))
+    edge_rate_pairs = list(zip(edges, scene.tree.edge_rate_scaling_factors))
+    edge_process_pairs = list(zip(edges, scene.tree.edge_processes))
     return T, root, edges, edge_rate_pairs, edge_process_pairs
