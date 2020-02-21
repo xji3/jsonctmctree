@@ -339,7 +339,7 @@ def interpret_tree(scene):
                 'should be non-negative')
     T = nx.DiGraph()
     T.add_nodes_from(nodes)
-    edges = zip(scene.tree.row_nodes, scene.tree.column_nodes)
+    edges = list(zip(scene.tree.row_nodes, scene.tree.column_nodes))
     T.add_edges_from(edges)
     if len(T.edges()) != len(edges):
         raise ContentError('the tree has an unexpected number of edges')
