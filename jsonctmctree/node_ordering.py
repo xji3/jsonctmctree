@@ -29,7 +29,7 @@ def get_node_to_subtree_depth(T, root):
 def get_node_to_subtree_thickness(T, root):
     thickness = {}
     for node in nx.dfs_postorder_nodes(T, root):
-        successors = T.successors(node)
+        successors = list(T.successors(node))
         if not successors:
             thickness[node] = 1
         else:
