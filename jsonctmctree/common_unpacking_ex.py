@@ -25,6 +25,7 @@ __all__ = [
 request_regex = '|'.join((
     '[dsw]nnlogl',
     '[dsw]dnderi',
+    '[dsw]dngrad',
     '[dsw][dw][dw]dwel',
     '[dsw][dsw]ntran',
     '[dsw]n[dw]root',

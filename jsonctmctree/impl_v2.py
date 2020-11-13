@@ -59,6 +59,7 @@ class Reactor(object):
         self.likelihoods = None
         self.log_likelihoods = None
         self.derivatives = None
+        self.gradients = None
         # If only the likelihoods and log likelihoods are required,
         # for example to check feasibility or to return log likelihoods
         # or to compute the posterior distribution at the root,
@@ -156,6 +157,14 @@ class Reactor(object):
         if unmet_core_requests & {'deri'}:
             return False
         self.derivatives = None
+        return True
+
+    def _delete_gradients(self, unmet_core_requests):
+        if self.gradients is None:
+            return False
+        if unmet_core_requests & {'grad'}:
+            return False
+        self.gradients = None
         return True
 
 
@@ -408,6 +417,20 @@ class Reactor(object):
                 responses[i] = out.tolist()
         return True
 
+    def _respond_to_grad(self, unmet_core_requests, requests, responses):
+        if 'grad' not in unmet_core_requests:
+            return False
+        if self.gradients is None:
+            return False
+        for i, request in enumerate(requests):
+            prefix = request.property[:3]
+            suffix = request.property[-4:]
+            if suffix == 'grad':
+                s = self.scene.state_space_shape
+                out = apply_reductions(s, request, self.derivatives)
+                responses[i] = out.tolist()
+        return True
+
     def _respond_to_node(self, unmet_core_requests, requests, responses):
         if 'node' not in unmet_core_requests:
             return False
@@ -627,6 +650,8 @@ class Reactor(object):
             return self._note('delete root marginal distn')
         if self._delete_derivatives(unmet_core_requests):
             return self._note('delete derivatives')
+        if self._delete_gradients(unmet_core_requests):
+            return self._note('delete gradients')
         if self._delete_root_conditional_likelihoods(unmet_core_requests):
             return self._note('delete root conditional likelihoods')
         if self._delete_likelihoods(unmet_core_requests):
@@ -651,6 +676,8 @@ class Reactor(object):
             return self._note('respond to a "logl" request')
         if self._respond_to_deri(unmet_core_requests, requests, responses):
             return self._note('respond to a "deri" request')
+        if self._respond_to_grad(unmet_core_requests, requests, responses):
+            return self._note('respond to a "grad" request')
         if self._respond_to_node(unmet_core_requests, requests, responses):
             return self._note('respond to a "node" request')
         if self._respond_to_dwel(unmet_core_requests, requests, responses):
