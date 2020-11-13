@@ -269,3 +269,15 @@ def get_conditional_likelihoods(
 
     # Return the map from node to array.
     return node_to_array
+
+def get_preorder_conditional_likelihoods(
+        expm_objects,
+        store_all,
+        T, root, edges, edge_rate_pairs, edge_process_pairs,
+        state_space_shape,
+        observable_nodes,
+        observable_axes,
+        iid_observations,
+        ):
+
+    return True

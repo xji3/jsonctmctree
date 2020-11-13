@@ -18,7 +18,7 @@ from .expm_helpers import (
         ImplicitTransitionExpmFrechetEx,
         )
 from .common_likelihood import (
-        get_conditional_likelihoods, get_subtree_likelihoods)
+        get_conditional_likelihoods, get_subtree_likelihoods, get_preorder_conditional_likelihoods)
 from .common_unpacking_ex import TopLevel, interpret_tree, interpret_root_prior
 from .common_reduction import apply_prefixed_reductions, apply_reductions
 from . import expect
@@ -55,6 +55,7 @@ class Reactor(object):
         self.checked_feasibility = False
         self.node_to_subtree_likelihoods = None
         self.node_to_conditional_likelihoods = None
+        self.node_to_preorder_conditional_likelihoods = None
         self.node_to_marginal_distn = None
         self.likelihoods = None
         self.log_likelihoods = None
@@ -101,7 +102,7 @@ class Reactor(object):
             return False
         if not self.checked_feasibility:
             return False
-        if unmet_core_requests & {'logl', 'deri', 'root'}:
+        if unmet_core_requests & {'logl', 'deri', 'grad', 'root'}:
             return False
         self.root_conditional_likelihoods = None
         return True
@@ -111,7 +112,7 @@ class Reactor(object):
             return False
         if not self.checked_feasibility:
             return False
-        if unmet_core_requests & {'deri'}:
+        if unmet_core_requests & {'deri', 'grad'}:
             return False
         if unmet_core_requests & {'logl'}:
             if self.log_likelihoods is None:
@@ -138,9 +139,12 @@ class Reactor(object):
     def _delete_node_to_conditional_likelihoods(self, unmet_core_requests):
         if self.node_to_conditional_likelihoods is None:
             return False
-        if unmet_core_requests & {'logl', 'deri', 'root'}:
+        if unmet_core_requests & {'logl', 'deri', 'grad', 'root'}:
             return False
         self.node_to_conditional_likelihoods = None
+
+        if unmet_core_requests & {'grad'}:
+            self.node_to_preorder_conditional_likelihoods = None
         return True
 
     def _delete_node_to_marginal_distn(self, unmet_core_requests):
@@ -154,7 +158,7 @@ class Reactor(object):
     def _delete_derivatives(self, unmet_core_requests):
         if self.derivatives is None:
             return False
-        if unmet_core_requests & {'deri'}:
+        if unmet_core_requests & {'deri', 'grad'}:
             return False
         self.derivatives = None
         return True
@@ -263,6 +267,41 @@ class Reactor(object):
             self.derivatives[:, ei] = der / self.likelihoods
         return True
 
+    def _create_gradients(self, unmet_core_requests):
+        if self.derivatives is not None:
+            return False
+        if not (unmet_core_requests & {'grad'}):
+            return False
+        if self.likelihoods is None:
+            return False
+        if self.node_to_conditional_likelihoods is None:
+            return False
+
+        # Compute the derivative of the likelihood
+        # with respect to each edge-specific rate scaling parameter.
+        #TODO do not necessarily request all edge derivatives
+        nedges = len(self.edges)
+        requested_derivative_edge_indices = set(range(nedges))
+        ei_to_derivatives = ll.get_edge_derivatives(
+                self.expm_objects, requested_derivative_edge_indices,
+                self.node_to_conditional_likelihoods, self.prior_distn,
+                self.T,
+                self.root,
+                self.edges,
+                self.edge_rate_pairs,
+                self.edge_process_pairs,
+                self.scene.state_space_shape,
+                self.scene.observed_data.nodes,
+                self.scene.observed_data.variables,
+                self.scene.observed_data.iid_observations)
+
+        # Fill an array with all unreduced derivatives.
+        iid_observation_count = len(self.scene.observed_data.iid_observations)
+        self.derivatives = np.empty((iid_observation_count, nedges))
+        for ei, der in ei_to_derivatives.items():
+            self.derivatives[:, ei] = der / self.likelihoods
+        return True
+
     def _create_root_conditional_likelihoods(self, unmet_core_requests):
         if self.root_conditional_likelihoods is not None:
             return False
@@ -270,7 +309,7 @@ class Reactor(object):
             return False
         if self.node_to_conditional_likelihoods is not None:
             return False
-        if unmet_core_requests & {'deri'}:
+        if unmet_core_requests & {'deri', 'grad'}:
             # in this case we need all conditional likelihoods not just root
             return False
         if unmet_core_requests & {'dwel', 'trans', 'node'}:
@@ -299,7 +338,7 @@ class Reactor(object):
     def _create_node_to_conditional_likelihoods(self, unmet_core_requests):
         if self.node_to_conditional_likelihoods is not None:
             return False
-        if not (unmet_core_requests & {'deri'}):
+        if not (unmet_core_requests & {'deri', 'grad'}):
             # other likelihood objects can be used for non-deri applications
             return False
         store_all = True
@@ -316,6 +355,22 @@ class Reactor(object):
                 self.scene.observed_data.variables,
                 self.scene.observed_data.iid_observations,
                 )
+
+        if (unmet_core_requests & {'grad'}):
+            # store preorder partials too
+            self.node_to_preorder_conditional_likelihoods = get_preorder_conditional_likelihoods(
+                self.expm_objects,
+                store_all,
+                self.T,
+                self.root,
+                self.edges,
+                self.edge_rate_pairs,
+                self.edge_process_pairs,
+                self.scene.state_space_shape,
+                self.scene.observed_data.nodes,
+                self.scene.observed_data.variables,
+                self.scene.observed_data.iid_observations,
+            )
         return True
 
     def _create_node_to_subtree_likelihoods(self, unmet_core_requests):
@@ -696,6 +751,8 @@ class Reactor(object):
             return self._note('create node to subtree likelihoods')
         if self._create_derivatives(unmet_core_requests):
             return self._note('create derivatives')
+        if self._create_gradients(unmet_core_requests):
+            return self._note('create gradients')
         if self._create_root_conditional_likelihoods(unmet_core_requests):
             return self._note('create root conditional likelihoods')
         if self._create_root_marginal_distn(unmet_core_requests):
