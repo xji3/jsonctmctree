@@ -278,6 +278,91 @@ def get_preorder_conditional_likelihoods(
         observable_nodes,
         observable_axes,
         iid_observations,
+        prior_distn,
         ):
 
-    return True
+    """
+    Recursively compute preorder partials at each node.
+
+    Without any attempt to order things intelligently.
+
+    The data provided by the caller gives us a sparse matrix
+    of shape (nsites, nnodes, nstates).
+
+    Parameters
+    ----------
+    expm_objects : sequence of functions indexed by process
+        These functions compute expm_mul and rate_mul.
+    store_all : bool
+        Indicates whether all edge arrays should be stored.
+
+    Returns
+    -------
+    node_to_preorder_conditional_likelihoods : dict
+        Maps nodes to ndarrays of shape (nstates, nsites).
+
+    Notes
+    -----
+    This function computes the preorder partials for all nodes on the tree.
+    """
+    node_to_postorder_partials = get_conditional_likelihoods(
+        expm_objects,
+        store_all,
+        T, root, edges, edge_rate_pairs, edge_process_pairs,
+        state_space_shape,
+        observable_nodes,
+        observable_axes,
+        iid_observations,
+        )
+
+    nstates = np.prod(state_space_shape)
+    nsites, nobservables = iid_observations.shape
+
+    child_to_edge = dict((tail, (head, tail)) for head, tail in edges)
+    edge_to_rate = dict(edge_rate_pairs)
+    edge_to_process = dict(edge_process_pairs)
+
+    # For the few nodes that are active at a given point in the traversal,
+    # we track a 2d array of shape (nsites, nstates).
+    node_to_preorder_partials = {}
+    for node in list(get_node_evaluation_order(T, root))[::-1]:  # reverse the post-order traversal to get a preorder traversal
+
+        # When a node is activated, its associated array
+        # is initialized to its observational likelihood array.
+        arr = np.ones((nstates, nsites), dtype=float)
+
+        if node == root:
+            arr *= prior_distn
+            node_to_preorder_partials[node] = arr
+            continue
+
+        parent_node = list(T.predecessors(node))[0]
+        arr *= node_to_preorder_partials[parent_node]
+
+        for child in T.successors(parent_node):
+            if child != node:
+                arr *= node_to_postorder_partials[child]
+
+        edge = child_to_edge[node]
+        edge_rate = edge_to_rate[edge]
+        edge_process = edge_to_process[edge]
+        arr = expm_objects[edge_process].expm_tmul(edge_rate, arr)
+
+        # Associate the array with the current node.
+        assert_equal(arr.shape, (nstates, nsites))
+        node_to_preorder_partials[node] = arr
+
+    # If we had been deleting arrays as they become unnecessary for
+    # the log likelihood calculation, then we would have only
+    # a single active array remaining at this point, corresponding to the root.
+    # But if we are saving the arrays for gradient calculations,
+    # then we have more left.
+    actual_keys = set(node_to_preorder_partials)
+    if store_all:
+        desired_keys = set(T)
+    else:
+        desired_keys = {root}
+    assert_equal(actual_keys, desired_keys)
+
+    # Return the map from node to array.
+    return node_to_preorder_partials

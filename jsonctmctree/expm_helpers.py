@@ -176,6 +176,14 @@ class ActionExpm(object):
         P = MatrixExponential(self._L.propagator, rate_scaling_factor)
         return P.dot(A)
 
+    def expm_tmul(self, rate_scaling_factor, A):
+        """
+        Compute exp(Q * r) * A.
+
+        """
+        P = MatrixExponential(self._L.propagator, rate_scaling_factor)
+        return P.T.dot(A)
+
     def rate_mul(self, rate_scaling_factor, PA):
         """
         Compute Q * r * PA.
