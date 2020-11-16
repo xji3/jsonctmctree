@@ -14,6 +14,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 from .expm_helpers import PadeExpm, EigenExpm, ActionExpm
+from jsonctmctree.node_ordering import get_node_evaluation_order
 
 from .common_unpacking import (
         SimpleError,
@@ -202,6 +203,75 @@ def get_edge_derivatives(
     # Return the map from edge index to edge-specific derivatives.
     return edge_index_to_derivatives
 
+
+def sample_joint_ancestral_state(
+        f,
+        requested_derivative_edge_indices,
+        node_to_postorder_array,
+        node_to_preorder_array,
+        T, root, edges, edge_rate_pairs, edge_process_pairs,
+        state_space_shape,
+        observable_nodes,
+        observable_axes,
+        iid_observations,
+        prior_distn,
+        ):
+    """
+    Recursively compute gradients at each edge.
+
+    Parameters
+    ----------
+    f : functions to compute expm_mul and rate_mul, per process
+        functions
+    requested_derivative_edge_indices : set of edge indices
+        set of requested edge indices for edge rate derivatives
+    node_to_postorder_array : dict
+        map from node to array returned by get_conditional_likelihoods
+    distn : 1d array
+        prior state distribution at the root
+
+    """
+    child_to_edge = dict((tail, (head, tail)) for head, tail in edges)
+    edge_to_rate = dict(edge_rate_pairs)
+    edge_to_process = dict(edge_process_pairs)
+    nstates = np.prod(state_space_shape)
+    nsites, nobservables = iid_observations.shape
+
+    node_to_joint_ancestral_state = {}
+    for node in list(get_node_evaluation_order(T, root))[::-1]:  # reverse the post-order traversal to get a preorder traversal
+
+        if node == root:
+            dist = node_to_postorder_array[root] * np.transpose([prior_distn])
+            dist = dist / np.sum(dist, axis = 0)
+            states = [np.random.choice(range(nstates), 1, replace = True, p = dist[:, i])[0] for i in range(nsites)]
+            node_to_joint_ancestral_state[node] = states
+            continue
+
+        # now calculate Pr(x_i | Y) \prop Pr(Y_under_i | x_i) Pr(X_i | X_pa(i)), where X_pa(i) is sampled already
+        edge = child_to_edge[node]
+        parent_node = list(T.predecessors(node))[0]
+        post_order_partial = create_indicator_array(
+            node,
+            state_space_shape,
+            observable_nodes,
+            observable_axes,
+            iid_observations)
+        for child in T.successors(node):
+            if child != node:
+                post_order_partial *= node_to_postorder_array[child]
+
+        parent_states = node_to_joint_ancestral_state[parent_node]
+        parent_state_arr = np.zeros((nstates, nsites), dtype = float)
+        for idx, state in enumerate(parent_states):
+            parent_state_arr[state, idx] = 1
+
+        parent_state_arr = f[edge_to_process[edge]].expm_tmul(edge_to_rate[edge], parent_state_arr)
+        dist = post_order_partial * parent_state_arr
+        dist = dist / np.sum(dist, axis = 0)
+        states = [np.random.choice(range(nstates), 1, replace = True, p = dist[:, i])[0] for i in range(nsites)]
+        node_to_joint_ancestral_state[node] = states
+
+    return node_to_joint_ancestral_state
 
 def get_edge_gradients(
         f,

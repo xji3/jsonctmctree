@@ -61,6 +61,7 @@ class Reactor(object):
         self.log_likelihoods = None
         self.derivatives = None
         self.gradients = None
+        self.node_to_joint_ancestral_state = None
         # If only the likelihoods and log likelihoods are required,
         # for example to check feasibility or to return log likelihoods
         # or to compute the posterior distribution at the root,
@@ -139,7 +140,7 @@ class Reactor(object):
     def _delete_node_to_conditional_likelihoods(self, unmet_core_requests):
         if self.node_to_conditional_likelihoods is None:
             return False
-        if unmet_core_requests & {'logl', 'deri', 'grad', 'root'}:
+        if unmet_core_requests & {'logl', 'deri', 'grad', 'root', 'ance'}:
             return False
         self.node_to_conditional_likelihoods = None
 
@@ -169,6 +170,15 @@ class Reactor(object):
         if unmet_core_requests & {'grad'}:
             return False
         self.gradients = None
+        return True
+
+
+    def _delete_node_to_ancestral_state(self, unmet_core_requests):
+        if self.node_to_joint_ancestral_state is None:
+            return False
+        if unmet_core_requests & {'ance'}:
+            return False
+        self.node_to_joint_ancestral_state = None
         return True
 
 
@@ -302,6 +312,33 @@ class Reactor(object):
             self.gradients[:, ei] = der / self.likelihoods
         return True
 
+    def _create_node_to_joint_ancestral_state(self, unmet_core_requests):
+        if self.node_to_joint_ancestral_state is not None:
+            return False
+        if not (unmet_core_requests & {'ance'}):
+            return False
+        if self.node_to_conditional_likelihoods is None:
+            return False
+
+
+        nedges = len(self.edges)
+        requested_derivative_edge_indices = set(range(nedges))
+        self.node_to_joint_ancestral_state = ll.sample_joint_ancestral_state(
+                self.expm_objects, requested_derivative_edge_indices,
+                self.node_to_conditional_likelihoods, self.node_to_preorder_conditional_likelihoods,
+                self.T,
+                self.root,
+                self.edges,
+                self.edge_rate_pairs,
+                self.edge_process_pairs,
+                self.scene.state_space_shape,
+                self.scene.observed_data.nodes,
+                self.scene.observed_data.variables,
+                self.scene.observed_data.iid_observations,
+                self.prior_distn,)
+
+        return True
+
     def _create_root_conditional_likelihoods(self, unmet_core_requests):
         if self.root_conditional_likelihoods is not None:
             return False
@@ -338,7 +375,7 @@ class Reactor(object):
     def _create_node_to_conditional_likelihoods(self, unmet_core_requests):
         if self.node_to_conditional_likelihoods is not None:
             return False
-        if not (unmet_core_requests & {'deri', 'grad'}):
+        if not (unmet_core_requests & {'deri', 'grad', 'ance'}):
             # other likelihood objects can be used for non-deri applications
             return False
         store_all = True
@@ -485,6 +522,24 @@ class Reactor(object):
             if suffix == 'grad':
                 s = self.scene.state_space_shape
                 out = apply_reductions(s, request, self.gradients)
+                responses[i] = out.tolist()
+        return True
+
+    def _respond_to_ance(self, unmet_core_requests, requests, responses):
+        if 'ance' not in unmet_core_requests:
+            return False
+        if self.node_to_joint_ancestral_state is None:
+            return False
+        arr = []
+        for node in range(self.scene.node_count):
+            arr.append(self.node_to_joint_ancestral_state[node])
+        full_node_array = np.array(arr).T
+        for i, request in enumerate(requests):
+            prefix = request.property[:3]
+            suffix = request.property[-4:]
+            if suffix == 'ance':
+                s = self.scene.state_space_shape
+                out = apply_reductions(s, request, full_node_array)
                 responses[i] = out.tolist()
         return True
 
@@ -709,6 +764,8 @@ class Reactor(object):
             return self._note('delete derivatives')
         if self._delete_gradients(unmet_core_requests):
             return self._note('delete gradients')
+        if self._delete_node_to_ancestral_state(unmet_core_requests):
+            return self._note('delete joint ancestral state sample')
         if self._delete_root_conditional_likelihoods(unmet_core_requests):
             return self._note('delete root conditional likelihoods')
         if self._delete_likelihoods(unmet_core_requests):
@@ -735,6 +792,8 @@ class Reactor(object):
             return self._note('respond to a "deri" request')
         if self._respond_to_grad(unmet_core_requests, requests, responses):
             return self._note('respond to a "grad" request')
+        if self._respond_to_ance(unmet_core_requests, requests, responses):
+            return self._note('respond to a "ance" request')
         if self._respond_to_node(unmet_core_requests, requests, responses):
             return self._note('respond to a "node" request')
         if self._respond_to_dwel(unmet_core_requests, requests, responses):
@@ -757,6 +816,8 @@ class Reactor(object):
             return self._note('create derivatives')
         if self._create_root_conditional_likelihoods(unmet_core_requests):
             return self._note('create root conditional likelihoods')
+        if self._create_node_to_joint_ancestral_state(unmet_core_requests):
+            return self._note('create one sample of node to joint ancestral state')
         if self._create_root_marginal_distn(unmet_core_requests):
             return self._note('create root marginal distn')
         if self._create_node_to_marginal_distn(unmet_core_requests):

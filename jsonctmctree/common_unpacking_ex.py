@@ -29,7 +29,8 @@ request_regex = '|'.join((
     '[dsw][dw][dw]dwel',
     '[dsw][dsw]ntran',
     '[dsw]n[dw]root',
-    '[dsw]n[dw]node'))
+    '[dsw]n[dw]node',
+    'ddnance'))
 
 
 class UnpackingError(Exception):
