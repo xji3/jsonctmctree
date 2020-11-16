@@ -337,11 +337,11 @@ def get_preorder_conditional_likelihoods(
             continue
 
         parent_node = list(T.predecessors(node))[0]
-        arr *= node_to_preorder_partials[parent_node]
-
         for child in T.successors(parent_node):
             if child != node:
                 arr *= node_to_postorder_partials[child]
+
+        arr *= node_to_preorder_partials[parent_node]
 
         edge = child_to_edge[node]
         edge_rate = edge_to_rate[edge]
