@@ -282,9 +282,9 @@ class Reactor(object):
         #TODO do not necessarily request all edge derivatives
         nedges = len(self.edges)
         requested_derivative_edge_indices = set(range(nedges))
-        ei_to_derivatives = ll.get_edge_derivatives(
+        ei_to_gradients = ll.get_edge_gradients(
                 self.expm_objects, requested_derivative_edge_indices,
-                self.node_to_conditional_likelihoods, self.prior_distn,
+                self.node_to_conditional_likelihoods, self.node_to_preorder_conditional_likelihoods,
                 self.T,
                 self.root,
                 self.edges,
@@ -297,9 +297,9 @@ class Reactor(object):
 
         # Fill an array with all unreduced derivatives.
         iid_observation_count = len(self.scene.observed_data.iid_observations)
-        self.derivatives = np.empty((iid_observation_count, nedges))
-        for ei, der in ei_to_derivatives.items():
-            self.derivatives[:, ei] = der / self.likelihoods
+        self.gradients = np.empty((iid_observation_count, nedges))
+        for ei, der in ei_to_gradients.items():
+            self.gradients[:, ei] = der / self.likelihoods
         return True
 
     def _create_root_conditional_likelihoods(self, unmet_core_requests):
@@ -483,7 +483,7 @@ class Reactor(object):
             suffix = request.property[-4:]
             if suffix == 'grad':
                 s = self.scene.state_space_shape
-                out = apply_reductions(s, request, self.derivatives)
+                out = apply_reductions(s, request, self.gradients)
                 responses[i] = out.tolist()
         return True
 

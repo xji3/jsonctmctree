@@ -332,7 +332,7 @@ def get_preorder_conditional_likelihoods(
         arr = np.ones((nstates, nsites), dtype=float)
 
         if node == root:
-            arr *= prior_distn
+            arr *= np.transpose([prior_distn])
             node_to_preorder_partials[node] = arr
             continue
 

@@ -203,6 +203,60 @@ def get_edge_derivatives(
     return edge_index_to_derivatives
 
 
+def get_edge_gradients(
+        f,
+        requested_derivative_edge_indices,
+        node_to_postorder_array,
+        node_to_preorder_array,
+        T, root, edges, edge_rate_pairs, edge_process_pairs,
+        state_space_shape,
+        observable_nodes,
+        observable_axes,
+        iid_observations,
+        ):
+    """
+    Recursively compute gradients at each edge.
+
+    Parameters
+    ----------
+    f : functions to compute expm_mul and rate_mul, per process
+        functions
+    requested_derivative_edge_indices : set of edge indices
+        set of requested edge indices for edge rate derivatives
+    node_to_postorder_array : dict
+        map from node to array returned by get_conditional_likelihoods
+    distn : 1d array
+        prior state distribution at the root
+
+    """
+    child_to_edge = dict((tail, (head, tail)) for head, tail in edges)
+    edge_to_rate = dict(edge_rate_pairs)
+    edge_to_process = dict(edge_process_pairs)
+
+    # Compute the likelihood derivative for each requested edge length.
+    edge_index_to_derivatives = dict()
+    for edge_index in requested_derivative_edge_indices:
+
+        # Get the edge that corresponds to the edge index of interest.
+        derivative_edge = edges[edge_index]
+
+        preorder_partial = node_to_preorder_array[derivative_edge[1]]
+        # postorder_partial = node_to_postorder_array[derivative_edge[1]]
+        nstates = np.prod(state_space_shape)
+        nsites, nobservables = iid_observations.shape
+        postorder_partial = np.ones((nstates, nsites), dtype=float)
+        for child in T.successors(derivative_edge[1]):
+            postorder_partial *= node_to_postorder_array[child]
+
+        # Compute the array at the root node.
+        edge_process = edge_to_process[derivative_edge]
+        gradient = f[edge_process].gradient_red(postorder_partial, preorder_partial)
+
+        edge_index_to_derivatives[edge_index] = gradient
+
+    # Return the map from edge index to edge-specific derivatives.
+    return edge_index_to_derivatives
+
 def process_json_in(j_in):
 
     # Unpack some sizes and shapes.

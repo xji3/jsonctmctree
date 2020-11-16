@@ -193,6 +193,15 @@ class ActionExpm(object):
         Q = self._L.instantaneous_operator
         return rate_scaling_factor * Q.dot(PA)
 
+    def gradient_red(self, left_vector, right_vector):
+        """
+        Compute p' * Q' * q.
+        This is for gradient calculation.
+
+        """
+        Q = self._L.instantaneous_operator
+        return np.sum(Q.dot(left_vector) * right_vector, axis = 0)
+
 
 class ActionExpmOld(object):
     def __init__(self, state_space_shape, row, col, rate, debug=False):
