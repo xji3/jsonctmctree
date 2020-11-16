@@ -750,10 +750,10 @@ class Reactor(object):
             return self._note('create node to conditional likelihoods')
         if self._create_node_to_subtree_likelihoods(unmet_core_requests):
             return self._note('create node to subtree likelihoods')
-        if self._create_derivatives(unmet_core_requests):
-            return self._note('create derivatives')
         if self._create_gradients(unmet_core_requests):
             return self._note('create gradients')
+        if self._create_derivatives(unmet_core_requests):
+            return self._note('create derivatives')
         if self._create_root_conditional_likelihoods(unmet_core_requests):
             return self._note('create root conditional likelihoods')
         if self._create_root_marginal_distn(unmet_core_requests):
