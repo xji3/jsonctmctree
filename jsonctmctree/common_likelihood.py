@@ -279,6 +279,7 @@ def get_preorder_conditional_likelihoods(
         observable_axes,
         iid_observations,
         prior_distn,
+        node_to_postorder_partials,
         ):
 
     """
@@ -305,15 +306,6 @@ def get_preorder_conditional_likelihoods(
     -----
     This function computes the preorder partials for all nodes on the tree.
     """
-    node_to_postorder_partials = get_conditional_likelihoods(
-        expm_objects,
-        store_all,
-        T, root, edges, edge_rate_pairs, edge_process_pairs,
-        state_space_shape,
-        observable_nodes,
-        observable_axes,
-        iid_observations,
-        )
 
     nstates = np.prod(state_space_shape)
     nsites, nobservables = iid_observations.shape

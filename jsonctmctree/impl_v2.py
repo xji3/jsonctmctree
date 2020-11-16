@@ -158,7 +158,7 @@ class Reactor(object):
     def _delete_derivatives(self, unmet_core_requests):
         if self.derivatives is None:
             return False
-        if unmet_core_requests & {'deri', 'grad'}:
+        if unmet_core_requests & {'deri'}:
             return False
         self.derivatives = None
         return True
@@ -371,6 +371,7 @@ class Reactor(object):
                 self.scene.observed_data.variables,
                 self.scene.observed_data.iid_observations,
                 self.prior_distn,
+                self.node_to_conditional_likelihoods
             )
         return True
 
