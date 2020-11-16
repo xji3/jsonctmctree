@@ -844,6 +844,8 @@ class Reactor(object):
         return j_out
 
 
-def process_json_in(j_in, debug=False):
+def process_json_in(j_in, debug=False, seed = None):
+    if seed is not None:
+        np.random.seed(seed)
     toplevel = TopLevel(j_in)
     return Reactor(toplevel.scene, debug=debug).main(toplevel.requests)

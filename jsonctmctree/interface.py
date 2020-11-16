@@ -62,7 +62,7 @@ def diagnose_expm_multiply():
     return _expm_multiply.expm_multiply(None, None)
 
 
-def process_json_in(j_in, debug=False):
+def process_json_in(j_in, debug=False, seed = None):
     """
     The part of the input that is the same across requests is as follows.
     I'm bundling all of this stuff together and calling it a 'scene'.
@@ -127,4 +127,4 @@ def process_json_in(j_in, debug=False):
         ]
 
     """
-    return impl_v2.process_json_in(j_in, debug=debug)
+    return impl_v2.process_json_in(j_in, debug=debug, seed = seed)
