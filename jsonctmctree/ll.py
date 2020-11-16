@@ -241,10 +241,12 @@ def get_edge_gradients(
         derivative_edge = edges[edge_index]
 
         preorder_partial = node_to_preorder_array[derivative_edge[1]]
-        # postorder_partial = node_to_postorder_array[derivative_edge[1]]
-        nstates = np.prod(state_space_shape)
-        nsites, nobservables = iid_observations.shape
-        postorder_partial = np.ones((nstates, nsites), dtype=float)
+        postorder_partial = create_indicator_array(
+                derivative_edge[1],
+                state_space_shape,
+                observable_nodes,
+                observable_axes,
+                iid_observations)
         for child in T.successors(derivative_edge[1]):
             postorder_partial *= node_to_postorder_array[child]
 
