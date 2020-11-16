@@ -252,7 +252,7 @@ def get_edge_gradients(
 
         # Compute the array at the root node.
         edge_process = edge_to_process[derivative_edge]
-        gradient = f[edge_process].gradient_red(postorder_partial, preorder_partial)
+        gradient = f[edge_process].gradient_red(edge_to_rate[derivative_edge], postorder_partial, preorder_partial)
 
         edge_index_to_derivatives[edge_index] = gradient
 
