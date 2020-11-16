@@ -330,7 +330,7 @@ class Reactor(object):
                 self.scene.state_space_shape,
                 self.scene.observed_data.nodes,
                 self.scene.observed_data.variables,
-                self.prior_distn,
+                self.scene.observed_data.iid_observations,
                 )
         self.root_conditional_likelihoods = d[self.root]
         return True
