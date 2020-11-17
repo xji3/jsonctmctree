@@ -241,7 +241,15 @@ def sample_joint_ancestral_state(
     for node in list(get_node_evaluation_order(T, root))[::-1]:  # reverse the post-order traversal to get a preorder traversal
 
         if node == root:
-            dist = node_to_postorder_array[root] * np.transpose([prior_distn])
+            dist = create_indicator_array(
+                node,
+                state_space_shape,
+                observable_nodes,
+                observable_axes,
+                iid_observations)
+            for child in T.successors(root):
+                dist *= node_to_postorder_array[child]
+            dist *= np.transpose([prior_distn])
             dist = dist / np.sum(dist, axis = 0)
             states = [np.random.choice(range(nstates), 1, replace = True, p = dist[:, i])[0] for i in range(nsites)]
             node_to_joint_ancestral_state[node] = states
